@@ -1,0 +1,19 @@
+# llama-cpp-python is installed in the Dockerfile with CUDA build flags
+# (CMAKE_ARGS="-DGGML_CUDA=on") and pinned there. Keep it out of this file
+# so local pip installs (for tests) don't trigger a 5-minute CUDA build.
+Flask==3.0.3
+Werkzeug==3.0.4
+gunicorn==23.0.0
+numpy==2.1.3
+pytest==8.3.3
+# v0.3 dashboard:
+python-docx==1.1.2
+pypdf==5.1.0
+pdfplumber==0.11.4
+# OCR fallback for scanned PDFs (third tier in modules/docx_parse.py).
+# pypdfium2 renders pages → PIL images, pytesseract OCRs them. Tesseract
+# binary + eng model installed at the system layer in Dockerfile.giovanni.
+pypdfium2==4.30.0
+pytesseract==0.3.13
+Pillow==10.4.0
+scipy>=1.11,<2

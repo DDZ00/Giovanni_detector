@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giovanni — Research Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg-primary: #1a1a1a; --bg-secondary: #2b2b2b; --bg-tertiary: #3a3a3a;
+  --text-primary: #ffffff; --text-secondary: #b0b0b0;
+  --accent-blue: #1f6aa5; --accent-blue-hover: #2884c7;
+  --border-color: #444444;
+  --good: #4caf50; --warn: #ff9800; --bad: #f44336;
+  --human: #4caf50; --synthetic: #f44336; --unknown: #777;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg-primary); color: var(--text-primary);
+  max-width: 1180px; margin: 1.5rem auto; padding: 0 1rem 4rem; line-height: 1.5;
+}
+header { border-bottom: 1px solid var(--border-color); padding-bottom: 0.8rem; margin-bottom: 1.2rem; }
+h1 { margin: 0; color: var(--accent-blue); font-weight: 600; font-size: 1.6rem; }
+h2 { font-size: 1.05rem; color: var(--text-primary); margin: 0 0 0.6rem; font-weight: 600; }
+h3 { font-size: 0.9rem; color: var(--text-secondary); margin: 0.8rem 0 0.4rem; text-transform: uppercase; letter-spacing: 0.5px; }
+.tagline { color: var(--text-secondary); margin: 0.2rem 0 0; font-size: 0.85rem; }
+nav { font-size: 0.85rem; }
+nav a { color: var(--text-secondary); text-decoration: none; }
+nav a:hover { color: var(--accent-blue); }
+section.card {
+  background: var(--bg-secondary); border: 1px solid var(--border-color);
+  border-radius: 6px; padding: 1rem 1.2rem; margin-bottom: 1rem;
+}
+label { display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 0.3rem; }
+input, select, textarea {
+  width: 100%; background: var(--bg-tertiary); color: var(--text-primary);
+  border: 1px solid var(--border-color); border-radius: 4px;
+  padding: 0.45rem 0.6rem; font-family: inherit; font-size: 0.9rem;
+}
+textarea { min-height: 100px; resize: vertical; line-height: 1.45; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent-blue); }
+button {
+  background: var(--accent-blue); color: #fff; border: 0; border-radius: 4px;
+  padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600;
+  cursor: pointer; transition: background 0.15s;
+}
+button:hover:not(:disabled) { background: var(--accent-blue-hover); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.danger { background: #5a2222; }
+button.danger:hover:not(:disabled) { background: #7a2828; }
+button.ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color); }
+button.toggle { font-weight: 600; min-width: 100px; }
+button.toggle.on  { background: var(--good); color: #0a1f0a; }
+button.toggle.on:hover:not(:disabled)  { background: #5cd460; }
+button.toggle.off { background: var(--bad);  color: #fff; }
+button.toggle.off:hover:not(:disabled) { background: #ff5a4f; }
+.row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-end; }
+.row > * { flex: 1; min-width: 140px; }
+.row > .narrow { flex: 0 0 auto; min-width: 0; }
+.grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.5rem; }
+.scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.4rem; margin-top: 0.6rem; }
+.score { background: var(--bg-tertiary); padding: 0.45rem 0.6rem; border-radius: 4px; }
+.score .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
+.score .val { font-size: 1.0rem; font-weight: 600; font-family: ui-monospace, monospace; }
+.cat { font-size: 1.2rem; font-weight: 600; margin: 0; }
+.diag { color: var(--text-secondary); margin: 0.3rem 0 0; font-size: 0.9rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border-color); }
+th { color: var(--text-secondary); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.4px; }
+tr:hover td { background: var(--bg-tertiary); }
+.badge {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px;
+  font-size: 0.7rem; font-weight: 600; text-transform: lowercase;
+  background: var(--bg-tertiary); color: var(--text-secondary);
+}
+.badge.human     { background: var(--human);     color: #000; }
+.badge.synthetic { background: var(--synthetic); color: #fff; }
+.badge.unknown   { background: var(--unknown);   color: #fff; }
+.error { background: #3a1f1f; border-color: var(--bad); color: #ffd7d7; padding: 0.6rem 0.8rem; border-radius: 4px; }
+.muted { color: var(--text-secondary); font-size: 0.85rem; }
+.tabs { display: flex; gap: 0.4rem; border-bottom: 1px solid var(--border-color); margin-bottom: 0.8rem; }
+.tab { background: transparent; border: 0; color: var(--text-secondary); padding: 0.5rem 0.9rem; cursor: pointer; border-bottom: 2px solid transparent; }
+.tab.active { color: var(--text-primary); border-bottom-color: var(--accent-blue); }
+.hidden { display: none !important; }
+.chart-wrap { background: var(--bg-tertiary); border-radius: 4px; padding: 0.5rem; margin-top: 0.6rem; }
+.warn-banner { background: #3a2f1f; border: 1px solid var(--warn); border-radius: 4px; padding: 0.4rem 0.6rem; margin-top: 0.5rem; font-size: 0.8rem; color: #ffe0b3; }
+.flex { display: flex; gap: 0.5rem; align-items: center; }
+.spacer { flex: 1; }
+/* Help button + modal */
+.help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; padding: 0; margin-left: 0.3rem;
+  background: var(--bg-tertiary); color: var(--text-secondary);
+  border: 1px solid var(--border-color); border-radius: 50%;
+  font-size: 0.7rem; font-weight: 600; cursor: pointer; line-height: 1;
+}
+.help-btn:hover { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+label.with-help { display: flex; align-items: center; }
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100;
+  display: none; align-items: center; justify-content: center; padding: 1rem;
+}
+.modal-backdrop.visible { display: flex; }
+.modal-card {
+  background: var(--bg-secondary); border: 1px solid var(--border-color);
+  border-radius: 8px; padding: 1.2rem 1.4rem; max-width: 520px; width: 100%;
+  max-height: 80vh; overflow-y: auto;
+}
+.modal-card h3 { color: var(--accent-blue); margin: 0 0 0.6rem; font-size: 1.0rem; text-transform: none; letter-spacing: 0; }
+.modal-card .field { margin: 0.6rem 0; }
+.modal-card .field-label { color: var(--text-secondary); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.15rem; }
+.modal-card .field-body { color: var(--text-primary); font-size: 0.9rem; line-height: 1.45; }
+.modal-card .modal-close { background: var(--bg-tertiary); color: var(--text-secondary); margin-top: 0.8rem; }
+.banner-warn {
+  background: #3a2f1f; border-left: 3px solid var(--warn); border-radius: 4px;
+  padding: 0.5rem 0.7rem; margin: 0.6rem 0; font-size: 0.85rem; color: #ffe0b3;
+}
+.banner-warn b { color: var(--warn); }
+.banner-info {
+  background: #1f2f3a; border-left: 3px solid var(--accent-blue); border-radius: 4px;
+  padding: 0.5rem 0.7rem; margin: 0.6rem 0; font-size: 0.85rem; color: #d7e8f5;
+}
+.banner-info b { color: var(--accent-blue-hover); }
+.banner-info .axes { display: grid; grid-template-columns: max-content 1fr; gap: 0.2rem 0.6rem; margin: 0.4rem 0; font-family: ui-monospace, monospace; font-size: 0.78rem; }
+.banner-info .axes .key { color: var(--text-secondary); }
+.banner-info .axes .lean-syn { color: #ff9c5a; }
+.banner-info .axes .lean-hum { color: #6bd968; }
+.banner-info .axes .lean-mid { color: var(--text-secondary); }
+.banner-info .axes .lean-sat { color: var(--warn); }
+.diff-row { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; align-items: center; padding: 0.3rem 0.5rem; background: var(--bg-tertiary); border-radius: 4px; margin-bottom: 0.3rem; }
+.diff-row .name { font-family: ui-monospace, monospace; font-size: 0.8rem; }
+.diff-row .desc { display: block; font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.1rem; }
+.diff-row .val { font-family: ui-monospace, monospace; font-size: 0.95rem; font-weight: 600; }
+</style>
+</head>
+<body>
+<header class="flex">
+  <div>
+    <nav><a href="/">&laquo; ai.home</a></nav>
+    <h1>Giovanni</h1>
+    <p class="tagline">Research dashboard — v{{ giovanni_version }} · calculus on log p(token)</p>
+  </div>
+  <div class="spacer"></div>
+  <div><a href="/giovanni/export/corpus.zip"><button class="ghost">⤓ Export corpus.zip</button></a></div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-tab="library">Library</button>
+  <button class="tab" data-tab="run">Analyze</button>
+  <button class="tab" data-tab="corpus">Corpus</button>
+</div>
+
+<!-- ═══════════════════════ LIBRARY ═══════════════════════ -->
+<div id="tab-library" class="tab-pane">
+  <section class="card">
+    <h2>Add sample</h2>
+    <div class="row">
+      <div><label>File (.txt, .docx, or .pdf)</label><input type="file" id="upload-file" accept=".txt,.docx,.pdf"></div>
+      <div><label>Label</label>
+        <select id="upload-label">
+          <option value="">— unlabeled —</option>
+          <option>human</option><option>synthetic</option><option>unknown</option>
+        </select>
+      </div>
+      <div><label>English proficiency</label>
+        <select id="upload-prof">
+          <option value="">— unset —</option>
+          <option value="native">Native English</option>
+          <option value="non_native">Non-Native English</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+      <div><label>Source</label><input type="text" id="upload-source" placeholder="e.g. Don Quijote ch.1"></div>
+      <div><label>Notes</label><input type="text" id="upload-notes" placeholder="optional"></div>
+    </div>
+    <div style="margin-top:0.6rem"><label>Or paste text directly</label>
+      <textarea id="upload-text" placeholder="Paste text here instead of uploading a file..."></textarea>
+    </div>
+    <div class="row" style="margin-top:0.6rem">
+      <div class="muted" id="upload-status">Pick a file or paste text, choose a label, click Add.</div>
+      <button class="narrow" id="upload-btn">Add sample</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Add folder of PDFs</h2>
+    <p class="muted" style="margin:0 0 0.6rem">Pick a folder — every <code>.pdf</code> inside it (recursively) becomes its own sample. Non-PDF files are skipped client-side.</p>
+    <div class="row">
+      <div><label>Folder</label><input type="file" id="batch-folder" multiple webkitdirectory directory accept=".pdf"></div>
+      <div><label>Or pick multiple files</label><input type="file" id="batch-files" multiple accept=".pdf"></div>
+      <div><label>Label (applied to all)</label>
+        <select id="batch-label">
+          <option value="">— unlabeled —</option>
+          <option>human</option><option>synthetic</option><option>unknown</option>
+        </select>
+      </div>
+      <div><label>English proficiency (applied to all)</label>
+        <select id="batch-prof">
+          <option value="">— unset —</option>
+          <option value="native">Native English</option>
+          <option value="non_native">Non-Native English</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+      <div><label>Source prefix (optional)</label><input type="text" id="batch-source" placeholder="defaults to each filename"></div>
+      <div><label>Notes</label><input type="text" id="batch-notes" placeholder="optional"></div>
+    </div>
+    <div class="row" style="margin-top:0.6rem">
+      <div class="muted" id="batch-status">Pick a folder or files, click Upload all.</div>
+      <button class="narrow" id="batch-btn">Upload all</button>
+    </div>
+    <table id="batch-results" class="hidden" style="margin-top:0.8rem">
+      <thead><tr><th>File</th><th>Status</th><th>Sample / Error</th><th>Words</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Samples <span class="muted" id="sample-count"></span></h2>
+    <div class="row" style="margin-bottom:0.6rem">
+      <div><label>Filter by label</label>
+        <select id="filter-label">
+          <option value="">— all —</option>
+          <option>human</option><option>synthetic</option><option>unknown</option>
+        </select>
+      </div>
+      <div><label>Filter by English proficiency</label>
+        <select id="filter-prof">
+          <option value="">— all —</option>
+          <option value="native">Native English</option>
+          <option value="non_native">Non-Native English</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+    </div>
+    <table id="samples-table">
+      <thead><tr><th>ID</th><th>Label</th><th>English</th><th>Words</th><th>Source / filename</th><th>Created</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</div>
+
+<!-- ═══════════════════════ ANALYZE ═══════════════════════ -->
+<div id="tab-run" class="tab-pane hidden">
+  <section class="card" id="run-empty">
+    <p class="muted">Pick a sample from the Library tab and click <b>Analyze</b>, or paste text below for a one-off run.</p>
+    <textarea id="adhoc-text" placeholder="Paste text for a one-off analysis (not saved to corpus)..."></textarea>
+    <div class="row" style="margin-top:0.6rem">
+      <div class="spacer"></div>
+      <button class="narrow" id="adhoc-btn">Analyze (one-off)</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="run-selected">
+    <h2>Selected sample <span id="sel-id" class="muted"></span></h2>
+    <div class="muted" id="sel-meta"></div>
+  </section>
+
+  <section class="card hidden" id="run-params">
+    <h2>Parameters
+      <button class="help-btn" data-help="concepts" title="What is Binoculars and what is calculus?" style="vertical-align:middle">?</button>
+    </h2>
+    <div class="grid-3">
+      <div><label class="with-help">threshold_binoculars<button class="help-btn" data-help="threshold_binoculars" title="What is this?">?</button></label><input type="number" step="0.005" min="0.5" max="1.5" id="p-bino" value="0.901"></div>
+      <div><label class="with-help">threshold_tv2<button class="help-btn" data-help="threshold_tv2" title="What is this?">?</button></label><input type="number" step="25" min="0" max="10000" id="p-tv2" value="1775"></div>
+      <div><label class="with-help">binoculars_weight<button class="help-btn" data-help="binoculars_weight" title="What is this?">?</button></label><input type="number" step="0.05" min="0" max="1" id="p-bw" value="0.7"></div>
+      <div><label class="with-help">binoculars_steepness<button class="help-btn" data-help="binoculars_steepness" title="What is this?">?</button></label><input type="number" step="1" min="1" max="50" id="p-bs" value="10"></div>
+      <div><label class="with-help">calculus_steepness<button class="help-btn" data-help="calculus_steepness" title="What is this?">?</button></label><input type="number" step="0.5" min="0.5" max="20" id="p-cs" value="4"></div>
+      <div><label class="with-help">max_chunk<button class="help-btn" data-help="max_chunk" title="What is this?">?</button></label><input type="number" step="128" min="256" max="8192" id="p-mc" value="2048"></div>
+      <div><label class="with-help">n_ctx (reload if changed)<button class="help-btn" data-help="n_ctx" title="What is this?">?</button></label>
+        <select id="p-nctx"><option>2048</option><option>4096</option><option>8192</option></select>
+      </div>
+      <div style="grid-column: 1 / -1"><label class="with-help">model pair (reload if changed)<button class="help-btn" data-help="pair_id" title="What is this?">?</button></label>
+        <select id="p-pair"></select>
+      </div>
+    </div>
+    <div class="warn-banner hidden" id="nctx-warn">Changing n_ctx or pair forces a model reload (~25-40 s on first analyze).</div>
+    <div class="row" style="margin-top:0.6rem;align-items:center;gap:0.6rem">
+      <div class="muted" id="run-status">Ready.</div>
+      <button class="help-btn narrow" data-help="use_calculus" title="What is this?" style="margin-left:auto">?</button>
+      <button type="button" id="p-calc" class="narrow toggle on" aria-pressed="true"
+              title="Calculus strategy: ON = Binoculars + tv2 blend, OFF = pure Binoculars">Calculus</button>
+      <button class="narrow" id="run-btn">Analyze</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="run-result">
+    <h2>Result <button class="help-btn" data-help="categoria_explainer" title="What do verdicts mean?" style="vertical-align:middle">?</button></h2>
+    <p class="cat" id="r-cat">—</p>
+    <p class="diag" id="r-diag"></p>
+    <div id="r-explanation" class="banner-info hidden"></div>
+    <div class="scores" id="r-scores"></div>
+    <h3>Verdict gauge <button class="help-btn" data-help="verdict_gauge" title="What does this show?">?</button></h3>
+    <div class="chart-wrap"><canvas id="chart-gauge" height="80"></canvas></div>
+    <h3>Binoculars per-token <button class="help-btn" data-help="binoculars_chart" title="What does this show?">?</button></h3>
+    <div class="chart-wrap"><canvas id="chart-binoculars" height="120"></canvas></div>
+    <h3>Calculus |l'(t)| <button class="help-btn" data-help="calculus_chart" title="What does this show?">?</button></h3>
+    <div class="chart-wrap"><canvas id="chart-deriv" height="100"></canvas></div>
+    <h3>Differential signals <button class="help-btn" data-help="differential_panel" title="What are these?">?</button></h3>
+    <div id="r-diff"></div>
+  </section>
+
+  <section class="card hidden" id="run-history">
+    <h2>Run history for this sample</h2>
+    <table id="runs-table"><thead><tr><th>Run</th><th>Categoria</th><th>B</th><th>tv2</th><th>p_ai</th><th>Strategy</th><th>Duration</th><th>When</th><th></th></tr></thead><tbody></tbody></table>
+  </section>
+</div>
+
+<!-- ═══════════════════════ CORPUS ═══════════════════════ -->
+<div id="tab-corpus" class="tab-pane hidden">
+  <section class="card">
+    <h2>Scatter</h2>
+    <div class="row">
+      <div><label>X axis</label><select id="sc-x"></select></div>
+      <div><label>Y axis</label><select id="sc-y"></select></div>
+      <div class="narrow"><label>&nbsp;</label><button id="sc-refresh">Refresh</button></div>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-scatter" height="280"></canvas></div>
+  </section>
+
+  <section class="card">
+    <h2>Histogram</h2>
+    <div class="row">
+      <div><label>Feature</label><select id="hg-feat"></select></div>
+      <div><label>Bins</label><input type="number" id="hg-bins" value="20" min="5" max="80"></div>
+      <div class="narrow"><label>&nbsp;</label><button id="hg-refresh">Refresh</button></div>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-hist" height="180"></canvas></div>
+  </section>
+
+  <section class="card">
+    <h2>Confusion matrix (is_ai = label starts with 'ai')</h2>
+    <div class="row">
+      <div><label>Feature</label><select id="cm-feat"></select></div>
+      <div><label>Threshold</label><input type="number" id="cm-thr" step="0.01" value="0.6"></div>
+      <div><label>Direction</label><select id="cm-dir"><option value="gt">≥ thr → AI</option><option value="lt">≤ thr → AI</option></select></div>
+      <div class="narrow"><label>&nbsp;</label><button id="cm-refresh">Compute</button></div>
+    </div>
+    <div id="cm-out" class="muted" style="margin-top:0.5rem">—</div>
+  </section>
+</div>
+
+<div id="modal" class="modal-backdrop">
+  <div class="modal-card">
+    <h3 id="modal-title">—</h3>
+    <div id="modal-body"></div>
+    <button class="modal-close" id="modal-close">Close</button>
+  </div>
+</div>
+
+<script>
+const HELP = {
+  concepts: {
+    title: "Concepts — Binoculars + calculus",
+    what: "Giovanni v0.4 uses TWO detectors. <b>Binoculars</b> (Hans et al. 2024, ICML) compares two views of the text through two language models that share a tokenizer (paper default: Falcon-7B + Falcon-7B-Instruct). It computes B = log PPL_M1 / log X-PPL_M1,M2. Below a threshold (~0.901) → AI. <b>Calculus</b> (the personal contribution) measures the total variation of the first derivative of the log-probability curve. High variation → AI.",
+    raise: "Both are scored on every analysis. The 'use calculus' toggle decides whether the verdict is pure-Binoculars or a soft-blend of the two.",
+    range: "B is roughly [0.5, 1.2]. tv2 for ~500-word texts is 1500–2500. p_bino, p_calc, p_ai are probabilities ∈ [0, 1].",
+    note: "Binoculars REQUIRES a same-tokenizer pair (e.g. Falcon, Qwen). On cross-tokenizer pairs (e.g. Qwen+Llama), the request is refused unless you enable use_calculus to fall back to calculus-only verdicts."
+  },
+  threshold_binoculars: {
+    title: "threshold_binoculars — Binoculars cutoff",
+    what: "The B score below which a text is called Synthetic. The paper reports 0.901 as a global threshold and 0.9 for out-of-domain corpora.",
+    raise: "Higher threshold → more texts called Synthetic (more sensitive). Lower → more conservative.",
+    range: "Reasonable range: 0.7 – 1.1. Default: 0.901 (paper's global value).",
+    note: "This is a knob you tune against your labelled corpus. The dashboard exists for that. Domain-specific thresholds are common; 0.901 is a starting point, not an oracle."
+  },
+  threshold_tv2: {
+    title: "threshold_tv2 — calculus AI cutoff",
+    what: "Total variation of the first derivative of the base-model log-probability curve. tv2 = Σ|l(t+1) − l(t)|. High = jagged surprise curve.",
+    raise: "Lower threshold → calculus flags more texts as AI. Higher → fewer.",
+    range: "Realistic range for ~500-word texts: 1500 – 2500. Default: 1775 (calibrated against an N=3 corpus 2026-05-01).",
+    note: "When use_calculus is OFF this knob has no effect on the verdict. The chart still renders so you can see where the variation comes from."
+  },
+  use_calculus: {
+    title: "use calculus strategy — toggle the personal contribution",
+    what: "<b>OFF — pure Binoculars (paper baseline):</b> verdict = (B < threshold_binoculars). Calculus is computed for visualization but ignored in the decision.<br><br><b>ON (default) — Binoculars + calculus soft-blend:</b> both detectors vote, the votes are squashed through sigmoids, and a weighted average gives p_ai. Verdict = (p_ai > 0.5).",
+    raise: "Use OFF to evaluate whether Binoculars alone solves your corpus. Use ON to test whether the calculus axis adds discriminating power.",
+    range: "Boolean. Each setting is recorded in runs.params so you can compare ON vs OFF on the same sample.",
+    note: "Designed for A/B science. Run each sample twice and compare verdicts in the corpus tab."
+  },
+  binoculars_weight: {
+    title: "binoculars_weight — blend weight",
+    what: "How much weight the soft-combine gives to Binoculars vs calculus. p_ai = w · p_bino + (1−w) · p_calc.",
+    raise: "Higher → Binoculars dominates. Lower → calculus dominates. 0 = pure calculus; 1 = pure Binoculars (in soft mode).",
+    range: "0 – 1. Default 0.7 (Binoculars dominant). Set to 1.0 + use_calculus=ON to A/B the OFF mode without hard-flipping the toggle.",
+    note: "Only matters when use_calculus is ON."
+  },
+  binoculars_steepness: {
+    title: "binoculars_steepness — sigmoid sharpness",
+    what: "Steepness of the sigmoid that converts Binoculars distance-from-threshold into a probability. p_bino = sigmoid((threshold − B) · k).",
+    raise: "Higher k → sharper transition (small distance from threshold → confident vote). Lower → softer transition (votes always near 0.5).",
+    range: "1 – 50. Default 10.",
+    note: "If most p_bino values cluster near 0.5, raise this. If almost all are 0 or 1, lower it."
+  },
+  calculus_steepness: {
+    title: "calculus_steepness — sigmoid sharpness",
+    what: "Steepness of the sigmoid that converts tv2 distance-from-threshold into a probability. p_calc = sigmoid((tv2/threshold − 1) · k).",
+    raise: "Higher k → sharper transition. Lower → softer.",
+    range: "0.5 – 20. Default 4.",
+    note: "tv2 is a sum (open-ended), so a smaller k makes sense than for the bounded Binoculars score."
+  },
+  max_chunk: {
+    title: "max_chunk — tokens per model call",
+    what: "How many tokens the model evaluates in one forward pass. Long texts are split into chunks; results are concatenated.",
+    raise: "Larger → more left-context per pass, slower, more VRAM. Must be ≤ n_ctx.",
+    range: "512 – 4096. Default: 2048.",
+    note: "Binoculars holds the full per-token softmax matrix in memory; raising max_chunk increases peak RAM proportionally."
+  },
+  pair_id: {
+    title: "Model pair — base + instruct partners",
+    what: "<b>falcon (default, Binoculars-original):</b> Falcon-7B base + Falcon-7B-Instruct. Same tokenizer ✓. The paper's canonical pair.<br><br><b>qwen:</b> Qwen-1.5B base + Qwen-1.5B-Instruct. Same tokenizer ✓. Smaller, faster, less expressive.<br><br><b>cross:</b> Qwen base + Llama-3 instruct. Different tokenizers ✗. Cannot run Binoculars; calculus-only verdict via use_calculus=ON.",
+    raise: "For Binoculars work, use falcon. For calculus-only experiments, any pair works.",
+    range: "Three presets registered. Adding more is a config-only change.",
+    note: "Switching pair forces a full GPU reload (~25-40 s). If a Binoculars analysis is requested on a cross-tokenizer pair, the API refuses with HTTP 400 unless use_calculus is also ON."
+  },
+  n_ctx: {
+    title: "n_ctx — model context window",
+    what: "Llama context length in tokens. Each prediction conditions on up to n_ctx earlier tokens.",
+    raise: "Larger → more left-context, slightly more accurate logprobs, more VRAM. Reload required.",
+    range: "2048 / 4096 / 8192. Default: 2048.",
+    note: "For 500-1500 word essays, 2048 suffices."
+  },
+  categoria_explainer: {
+    title: "Verdicts — Synthetic vs Human",
+    what: "Only two outcomes. Synthetic = AI-generated; Human = human-written. The decision is driven by Binoculars (and optionally calculus when use_calculus is ON).",
+    raise: "<b>• Synthetic</b> — B < threshold_binoculars (or p_ai > 0.5 in soft mode). The two models agreed on the actual tokens more than they agreed on each other's distributions.<br><br><b>• Human</b> — B ≥ threshold_binoculars (or p_ai ≤ 0.5 in soft mode). The actual tokens were more surprising to the observer than M2's distribution was.",
+    range: "The verdict is binary. The 'why this verdict' panel above shows how close it was to flipping.",
+    note: "If Binoculars cannot run (cross-tokenizer pair), the strategy field will be 'calculus_only' and the verdict comes from tv2 alone."
+  },
+  verdict_gauge: {
+    title: "Verdict gauge — how close did it land?",
+    what: "Three horizontal bars: p_bino, p_calc, p_ai. Each is the probability of AI according to one detector (or the blend). The 0.5 line is the verdict threshold; bars to the right of 0.5 (red) mean that detector voted Synthetic.",
+    raise: "There's no knob that 'raises' these — they are computed from the underlying scores via sigmoids. To make the votes more confident, raise binoculars_steepness or calculus_steepness.",
+    range: "0 to 1. Lengths near 0.5 mean borderline calls.",
+    note: "If p_bino and p_calc disagree visibly, the soft-blend is doing real work. If they always agree, the blend is redundant on your corpus."
+  },
+  binoculars_chart: {
+    title: "Binoculars per-token chart",
+    what: "Two overlaid lines, one per token. <b>Red</b> = log PPL_M1 = how surprised the observer was by the actual token. <b>Blue</b> = X-PPL = how surprised the observer would have been by M2's predicted distribution. The Binoculars score is the ratio of their averages.",
+    raise: "When red ≈ blue across the text, the actual tokens are no more surprising than M2's expectations → AI. When red > blue, the actual tokens are more surprising than M2's predictions → human.",
+    range: "Both quantities are non-negative log-probabilities; typical values 1 – 10 nats per token.",
+    note: "Where the two lines diverge is where the verdict is being decided. A sustained gap (red >> blue) is a strong human signal."
+  },
+  calculus_chart: {
+    title: "Calculus |l'(t)| bar chart",
+    what: "One bar per token, height = absolute first derivative of the base-model log-probability curve. The sum of all heights is tv2.",
+    raise: "Higher bars = bigger surprise jumps at that position (template-vs-content alternation, or a startled-by-this-token moment).",
+    range: "Typical bar heights 0 – 8 nats; spikes can hit 15+.",
+    note: "If the bars cluster around one big spike, the tv2 score is dominated by a single position (likely a typo or rare proper noun). If they are evenly distributed, tv2 reflects systemic variation — the more credible AI signal."
+  },
+  binoculars_score: {
+    title: "Binoculars B — reading the value",
+    what: "B = log PPL_M1 / log X-PPL_M1,M2. Below threshold_binoculars → AI; above → human.",
+    raise: "Not a knob. Determined by the text and the model pair.",
+    range: "<b>Reading guide:</b><br>• B < 0.85 → strong AI<br>• 0.85 – 0.901 → AI<br>• 0.901 – 0.95 → human<br>• 0.95+ → strong human",
+    note: "Always interpret B together with the pair_id — same-family pairs produce systematically different B values than cross-family pairs."
+  },
+  log_ppl_m1: {
+    title: "log PPL_M1 — observer perplexity",
+    what: "Average per-token negative log-likelihood under the observer model M1. High = M1 was surprised by the actual tokens.",
+    raise: "Determined by the text. Texts the observer's training distribution doesn't cover well will be more surprising.",
+    range: "Typical: 1 – 8 nats per token.",
+    note: "Numerator of the Binoculars ratio."
+  },
+  log_x_ppl: {
+    title: "log X-PPL — cross-perplexity",
+    what: "Average per-token cross-entropy between M1's full predicted distribution and M2's full predicted distribution. High = the two models disagree about what should come next.",
+    raise: "Determined by how similar M1 and M2 are. Same-family pairs have lower X-PPL than cross-family pairs.",
+    range: "Typical: 1 – 6 nats per token.",
+    note: "Denominator of the Binoculars ratio. Normalizes B against the prompt-induced perplexity baseline."
+  },
+  p_bino: {
+    title: "p_bino — Binoculars vote",
+    what: "Probability that Binoculars considers the text AI. Computed as sigmoid((threshold − B) × steepness).",
+    raise: "Closer to 0 = Binoculars confident it's human. Closer to 1 = confident AI. Around 0.5 = borderline.",
+    range: "0 – 1.",
+    note: "Visible on the verdict gauge above."
+  },
+  p_calc: {
+    title: "p_calc — calculus vote",
+    what: "Probability that calculus considers the text AI. Computed as sigmoid((tv2/threshold − 1) × steepness).",
+    raise: "Closer to 0 = calculus confident human. Closer to 1 = confident AI.",
+    range: "0 – 1. May be null on cross-tokenizer pairs (calculus still works but the verdict was already decided).",
+    note: "Visible on the verdict gauge above."
+  },
+  p_ai: {
+    title: "p_ai — final blended probability",
+    what: "Weighted average of p_bino and p_calc. Verdict = Synthetic if p_ai > 0.5.",
+    raise: "Tune binoculars_weight to shift the balance.",
+    range: "0 – 1.",
+    note: "When use_calculus is OFF, p_ai equals p_bino (calculus is silenced)."
+  },
+  strategy: {
+    title: "Strategy used",
+    what: "Which classifier produced the verdict. Three possible values:<br>• <b>binoculars</b> — pure Binoculars (use_calculus=OFF).<br>• <b>binoculars+calculus</b> — soft-combined (use_calculus=ON, same-tokenizer pair).<br>• <b>calculus_only</b> — Binoculars unavailable (cross-tokenizer pair); verdict from tv2 alone.",
+    raise: "Toggle use_calculus or change pair_id to switch strategies.",
+    range: "—",
+    note: "Recorded in every run for reproducibility."
+  },
+  tokens_count: {
+    title: "Tokens analysed",
+    what: "How many positions the model actually scored. Tokens are sub-word units (1.3 to 1.6 per English word).",
+    raise: "Determined by input length and the tokenizer.",
+    range: "<b>Reading guide:</b><br>• &lt; 100 → unstable<br>• 100 – 300 → noisy<br>• 300 – 1500 → ideal<br>• 1500+ → strongest precision",
+    note: "Both Binoculars and calculus get more reliable as token count grows."
+  },
+  differential_panel: {
+    title: "Differential signals — calculus measurements",
+    what: "Twelve numbers describing the regularity of the log-probability curve. The verdict-driving one is tv2; the others are exposed for visualization and future experiments.",
+    raise: "Synthetic texts tend to have LOWER values across the board (smoother curve). Human/literary writing scores higher.",
+    range: "Order of magnitude for ~500-word essays: tv2 ≈ 200 (clean AI) … 2000+ (literary human).",
+    note: "Use these in the Corpus tab's scatter and confusion matrix to find better separators than tv2 alone if any exist."
+  },
+};
+
+const DIFF_DESC = {
+  tv1:    ["Surprise wander (instruct)",  "Total amount the surprise curve wanders end-to-end under the instruct model. Higher = more humanity."],
+  tv2:    ["Surprise wander (base)",      "Same, under the base model. Synthetic: lower (~200-500). Human L1 / literary: higher (1000+)."],
+  l2_1:   ["Wander energy (instruct)",    "RMS-style wander — penalises a few sharp spikes more than many small ones. Rewards bursts of surprise."],
+  l2_2:   ["Wander energy (base)",        "Same, under the base model. Synthetic: ~10-30. Human: 50+."],
+  linf1_1:["Peak surprise jump (instruct)","Single biggest token-to-token surprise change — the 'most jarring word' under instruct."],
+  linf1_2:["Peak surprise jump (base)",   "Same, under base. A clean AI text rarely peaks above 5; literary humans hit 15+."],
+  linf2_1:["Peak surprise kink (instruct)","Sharpest change-of-slope in the surprise curve. Catches sudden register switches."],
+  linf2_2:["Peak surprise kink (base)",   "Same, under base."],
+  mad1:   ["Surprise noise floor (instruct)","Robust median-absolute-deviation of the surprise — the typical, outlier-resistant variability level."],
+  mad2:   ["Surprise noise floor (base)", "Synthetic: ~0.3-0.6. Human-L1: 1.5-2.5. The most reliable humanity signal in this set."],
+  stv2:   ["Macro-scale wander (base)",   "Surprise wander after Gaussian smoothing — strips token-level noise to expose paragraph-scale humanity."],
+  slinf2: ["Macro-scale peak (base)",     "Peak jump on the smoothed curve. Targets paragraph-scale surprise events, not single-word ones."],
+};
+
+function showHelp(key) {
+  const h = HELP[key]; if (!h) return;
+  document.getElementById('modal-title').textContent = h.title;
+  document.getElementById('modal-body').innerHTML = `
+    <div class="field"><div class="field-label">What it is</div><div class="field-body">${h.what}</div></div>
+    <div class="field"><div class="field-label">Effect of raising it</div><div class="field-body">${h.raise}</div></div>
+    <div class="field"><div class="field-label">Prudent range</div><div class="field-body">${h.range}</div></div>
+    <div class="field"><div class="field-label">Note</div><div class="field-body">${h.note}</div></div>`;
+  document.getElementById('modal').classList.add('visible');
+}
+document.addEventListener('click', e => {
+  if (e.target.classList && e.target.classList.contains('help-btn')) {
+    showHelp(e.target.dataset.help);
+  } else if (e.target.id === 'modal-close' || e.target.id === 'modal') {
+    document.getElementById('modal').classList.remove('visible');
+  }
+});
+
+const FEATURES = ["binoculars", "log_ppl_m1", "log_x_ppl", "p_bino", "p_calc", "p_ai",
+  "tv1", "tv2", "l2_1", "l2_2", "linf1_1", "linf1_2", "linf2_1", "linf2_2",
+  "mad1", "mad2", "stv2", "slinf2"];
+const LABELS = ["human", "synthetic", "unknown"];
+const LABEL_COLORS = {
+  "human": "#4caf50", "synthetic": "#f44336", "unknown": "#777", "_unlabeled": "#555"
+};
+
+let selectedSample = null;
+let charts = {};
+
+// ── Tab switching ──
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+  document.getElementById('tab-' + t.dataset.tab).classList.remove('hidden');
+  if (t.dataset.tab === 'corpus') refreshCorpus();
+}));
+
+// ── Library ──
+const PROF_LABEL = { native: 'Native', non_native: 'Non-Native', unknown: 'Unknown' };
+
+async function refreshSamples() {
+  const label = document.getElementById('filter-label').value;
+  const prof = document.getElementById('filter-prof').value;
+  const params = new URLSearchParams();
+  if (label) params.set('label', label);
+  if (prof) params.set('english_proficiency', prof);
+  const qs = params.toString();
+  const url = '/giovanni/samples' + (qs ? '?' + qs : '');
+  const r = await fetch(url); const data = await r.json();
+  const tbody = document.querySelector('#samples-table tbody');
+  tbody.innerHTML = '';
+  data.samples.forEach(s => {
+    const tr = document.createElement('tr');
+    const profCell = s.english_proficiency
+      ? `<span class="badge">${PROF_LABEL[s.english_proficiency] || s.english_proficiency}</span>`
+      : '<span class="muted">—</span>';
+    tr.innerHTML = `<td>${s.id}</td>
+      <td><span class="badge ${s.label||'unknown'}">${s.label||'—'}</span></td>
+      <td>${profCell}</td>
+      <td>${s.n_words}</td>
+      <td>${escapeHtml(s.source||'')}${s.filename?' <span class="muted">('+escapeHtml(s.filename)+')</span>':''}</td>
+      <td class="muted">${(s.created_at||'').slice(0,19).replace('T',' ')}</td>
+      <td><button class="ghost" data-act="select" data-id="${s.id}">Use</button>
+          <button class="danger" data-act="del" data-id="${s.id}">×</button></td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('sample-count').textContent = `(${data.samples.length})`;
+  tbody.querySelectorAll('button[data-act=select]').forEach(b => b.addEventListener('click', () => selectSample(+b.dataset.id)));
+  tbody.querySelectorAll('button[data-act=del]').forEach(b => b.addEventListener('click', () => deleteSample(+b.dataset.id)));
+}
+
+document.getElementById('filter-label').addEventListener('change', refreshSamples);
+document.getElementById('filter-prof').addEventListener('change', refreshSamples);
+
+document.getElementById('upload-btn').addEventListener('click', async () => {
+  const file = document.getElementById('upload-file').files[0];
+  const label = document.getElementById('upload-label').value;
+  const prof = document.getElementById('upload-prof').value;
+  const source = document.getElementById('upload-source').value;
+  const notes = document.getElementById('upload-notes').value;
+  const text = document.getElementById('upload-text').value;
+  const status = document.getElementById('upload-status');
+
+  if (!file && !text.trim()) { status.textContent = 'Need a file or pasted text.'; return; }
+  status.textContent = 'Uploading...';
+  const fd = new FormData();
+  if (file) fd.append('file', file);
+  if (text.trim()) fd.append('text', text);
+  if (label) fd.append('label', label);
+  if (prof) fd.append('english_proficiency', prof);
+  if (source) fd.append('source', source);
+  if (notes) fd.append('notes', notes);
+
+  try {
+    const r = await fetch('/giovanni/samples', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (!r.ok) { status.textContent = 'Error: ' + (data.error || r.status); return; }
+    status.textContent = `Added sample #${data.id} (${data.n_words} words).`;
+    document.getElementById('upload-file').value = '';
+    document.getElementById('upload-text').value = '';
+    document.getElementById('upload-source').value = '';
+    document.getElementById('upload-notes').value = '';
+    refreshSamples();
+  } catch (e) { status.textContent = 'Network error: ' + e.message; }
+});
+
+document.getElementById('batch-btn').addEventListener('click', async () => {
+  const folderEl = document.getElementById('batch-folder');
+  const filesEl = document.getElementById('batch-files');
+  const status = document.getElementById('batch-status');
+  const tbl = document.getElementById('batch-results');
+  const tbody = tbl.querySelector('tbody');
+
+  const all = [...folderEl.files, ...filesEl.files];
+  const pdfs = all.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  const skipped = all.length - pdfs.length;
+  if (!pdfs.length) {
+    status.textContent = `No .pdf files found${skipped ? ` (${skipped} non-PDF skipped)` : ''}.`;
+    return;
+  }
+
+  status.textContent = `Uploading ${pdfs.length} file${pdfs.length===1?'':'s'}${skipped?` (${skipped} non-PDF skipped)`:''}...`;
+  const btn = document.getElementById('batch-btn');
+  btn.disabled = true;
+
+  const fd = new FormData();
+  pdfs.forEach(f => fd.append('files', f, f.name));
+  const label = document.getElementById('batch-label').value;
+  const prof = document.getElementById('batch-prof').value;
+  const source = document.getElementById('batch-source').value;
+  const notes = document.getElementById('batch-notes').value;
+  if (label) fd.append('label', label);
+  if (prof) fd.append('english_proficiency', prof);
+  if (source) fd.append('source', source);
+  if (notes) fd.append('notes', notes);
+
+  try {
+    const r = await fetch('/giovanni/samples/batch', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (!r.ok) { status.textContent = 'Error: ' + (data.error || r.status); btn.disabled = false; return; }
+    status.textContent = `Added ${data.added} of ${data.total}.`;
+    tbl.classList.remove('hidden');
+    tbody.innerHTML = '';
+    for (const e of data.results) {
+      const cls = e.status === 'added' ? 'human' : (e.status === 'duplicate' ? 'unknown' : 'synthetic');
+      const detail = e.status === 'added' ? `#${e.sample_id}` : escapeHtml(e.error || '');
+      tbody.insertAdjacentHTML('beforeend',
+        `<tr><td>${escapeHtml(e.filename)}</td>
+             <td><span class="badge ${cls}">${e.status}</span></td>
+             <td class="muted">${detail}</td>
+             <td>${e.n_words || ''}</td></tr>`);
+    }
+    folderEl.value = ''; filesEl.value = '';
+    refreshSamples();
+  } catch (e) { status.textContent = 'Network error: ' + e.message; }
+  finally { btn.disabled = false; }
+});
+
+async function deleteSample(id) {
+  if (!confirm(`Delete sample #${id} and all its runs?`)) return;
+  await fetch('/giovanni/samples/' + id, { method: 'DELETE' });
+  if (selectedSample && selectedSample.id === id) { selectedSample = null; renderSelected(); }
+  refreshSamples();
+}
+
+async function selectSample(id) {
+  const r = await fetch('/giovanni/samples/' + id);
+  selectedSample = await r.json();
+  renderSelected();
+  document.querySelector('.tab[data-tab=run]').click();
+  loadRunHistory();
+}
+
+function renderSelected() {
+  const empty = document.getElementById('run-empty');
+  const sel = document.getElementById('run-selected');
+  const params = document.getElementById('run-params');
+  if (!selectedSample) {
+    empty.classList.remove('hidden'); sel.classList.add('hidden'); params.classList.add('hidden');
+    document.getElementById('run-result').classList.add('hidden');
+    document.getElementById('run-history').classList.add('hidden');
+    return;
+  }
+  empty.classList.add('hidden'); sel.classList.remove('hidden'); params.classList.remove('hidden');
+  document.getElementById('sel-id').textContent = `#${selectedSample.id}`;
+  const lbl = selectedSample.label || '—';
+  document.getElementById('sel-meta').innerHTML =
+    `<span class="badge ${selectedSample.label||'unknown'}">${lbl}</span> ·
+     ${selectedSample.n_words} words · ${escapeHtml(selectedSample.source||'')} ${selectedSample.filename?'('+escapeHtml(selectedSample.filename)+')':''}
+     <br><span class="muted">${escapeHtml((selectedSample.text||'').slice(0,200))}…</span>`;
+}
+
+// ── Run ──
+function readParams() {
+  return {
+    threshold_binoculars: parseFloat(document.getElementById('p-bino').value),
+    threshold_tv2:        parseFloat(document.getElementById('p-tv2').value),
+    binoculars_weight:    parseFloat(document.getElementById('p-bw').value),
+    binoculars_steepness: parseFloat(document.getElementById('p-bs').value),
+    calculus_steepness:   parseFloat(document.getElementById('p-cs').value),
+    max_chunk:    parseInt(document.getElementById('p-mc').value, 10),
+    n_ctx:        parseInt(document.getElementById('p-nctx').value, 10),
+    pair_id:      document.getElementById('p-pair').value || null,
+    use_calculus: document.getElementById('p-calc').classList.contains('on'),
+  };
+}
+
+document.getElementById('p-calc').addEventListener('click', e => {
+  const btn = e.currentTarget;
+  const isOn = btn.classList.toggle('on');
+  btn.classList.toggle('off', !isOn);
+  btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+  btn.title = isOn
+    ? 'Calculus strategy: ON = Binoculars + tv2 blend, OFF = pure Binoculars'
+    : 'Calculus strategy: OFF = pure Binoculars (click to enable tv2 blend)';
+});
+
+async function loadModelPairs() {
+  try {
+    const r = await fetch('/giovanni/health');
+    const data = await r.json();
+    const sel = document.getElementById('p-pair');
+    if (!sel) return;
+    sel.innerHTML = '';
+    (data.model_pairs || []).forEach(p => {
+      const opt = new Option(p.label, p.id);
+      if (p.id === data.default_pair) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch (e) { /* ignore — UI still works with defaults */ }
+}
+loadModelPairs();
+
+let lastNctx = 2048;
+document.getElementById('p-nctx').addEventListener('change', e => {
+  document.getElementById('nctx-warn').classList.toggle('hidden', parseInt(e.target.value, 10) === lastNctx);
+});
+
+document.getElementById('run-btn').addEventListener('click', async () => {
+  if (!selectedSample) return;
+  const status = document.getElementById('run-status');
+  const btn = document.getElementById('run-btn');
+  const params = readParams();
+  status.textContent = 'Analyzing...';
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/giovanni/samples/${selectedSample.id}/analyze`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ params, verbose: true }) });
+    const raw = await r.text();
+    let data;
+    try { data = JSON.parse(raw); }
+    catch (e) {
+      status.textContent = `Server returned non-JSON (HTTP ${r.status}). Likely a proxy/worker timeout during a cold model load — try again, the second call is faster.`;
+      return;
+    }
+    if (!r.ok) { status.textContent = 'Error: ' + (data.error || r.status); return; }
+    status.textContent = `Done in ${(data.duration_ms/1000).toFixed(1)} s (run #${data.run_id})`;
+    lastNctx = params.n_ctx;
+    document.getElementById('nctx-warn').classList.add('hidden');
+    renderResult(data.result);
+    loadRunHistory();
+  } catch (e) { status.textContent = 'Network error: ' + e.message; }
+  finally { btn.disabled = false; }
+});
+
+document.getElementById('adhoc-btn').addEventListener('click', async () => {
+  const text = document.getElementById('adhoc-text').value;
+  if (!text.trim()) return;
+  const r = await fetch('/giovanni/analyze', { method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ text, verbose: true, params: readParams() })});
+  const raw = await r.text();
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (e) {
+    alert(`Server returned non-JSON (HTTP ${r.status}). Likely a proxy/worker timeout during a cold model load — try again.`);
+    return;
+  }
+  if (!r.ok) { alert(data.error || 'error'); return; }
+  document.getElementById('run-empty').classList.add('hidden');
+  renderResult(data);
+});
+
+function renderResult(res) {
+  const sec = document.getElementById('run-result');
+  sec.classList.remove('hidden');
+  if (res.error) {
+    document.getElementById('r-cat').textContent = '— content error —';
+    document.getElementById('r-diag').textContent = res.error;
+    document.getElementById('r-scores').innerHTML = '';
+    document.getElementById('r-diff').innerHTML = '';
+    return;
+  }
+  document.getElementById('r-cat').textContent = res.categoria || '—';
+  document.getElementById('r-diag').textContent = res.diagnostico || '';
+  renderCategoryExplanation(res);
+
+  const bino = res.binoculars || {};
+  const probs = res.probabilities || {};
+  const th = res.thresholds || {};
+  document.getElementById('r-scores').innerHTML = scoreCard([
+    ['Binoculars B',     fmt(bino.score, 4),       'binoculars_score'],
+    ['log PPL_M1',       fmt(bino.log_ppl_m1, 4),  'log_ppl_m1'],
+    ['log X-PPL',        fmt(bino.log_x_ppl, 4),   'log_x_ppl'],
+    ['p_bino',           fmt(probs.p_bino, 3),     'p_bino'],
+    ['p_calc',           fmt(probs.p_calc, 3),     'p_calc'],
+    ['p_ai',             fmt(probs.p_ai, 3),       'p_ai'],
+    ['Strategy',         res.strategy || '—',      'strategy'],
+    ['Tokens',           res.tokens_analizados,    'tokens_count'],
+  ]);
+  const d = res.differential || {};
+  document.getElementById('r-diff').innerHTML = Object.entries(d).map(([k, v]) => {
+    const desc = DIFF_DESC[k] || [k, ""];
+    return `<div class="diff-row">
+      <div><span class="name">${desc[0]}</span><span class="desc">${desc[1]}</span></div>
+      <div class="val">${fmt(v, 4)}</div>
+    </div>`;
+  }).join('');
+  drawCurves(res);
+}
+
+function drawCurves(res) {
+  const verbose = res.verbose || {};
+  const bino = res.binoculars || {};
+  const th = res.thresholds || {};
+  const probs = res.probabilities || {};
+
+  // ── Verdict gauge: horizontal bars for p_bino, p_calc, p_ai ──
+  const gaugeLabels = ['p_bino', 'p_calc', 'p_ai'];
+  const gaugeVals = [probs.p_bino, probs.p_calc, probs.p_ai].map(v => v == null ? null : v);
+  const gaugeColors = gaugeVals.map(v => v == null ? '#555' : (v > 0.5 ? '#f44336' : '#4caf50'));
+  drawChart('chart-gauge', {
+    type: 'bar',
+    data: { labels: gaugeLabels,
+      datasets: [{ label: 'P(AI)', data: gaugeVals, backgroundColor: gaugeColors }]},
+    options: {
+      indexAxis: 'y', responsive: true, animation: false,
+      plugins: {
+        legend: { display: false },
+        annotation: {}, // chart.js annotation plugin not loaded; simulate threshold below
+      },
+      scales: {
+        x: { min: 0, max: 1,
+             ticks: { color: '#b0b0b0', callback: v => v.toFixed(1) },
+             title: { display: true, text: 'P(AI)  —  red ≥ 0.5  →  Synthetic', color: '#b0b0b0' },
+             grid: { color: '#3a3a3a' }},
+        y: { ticks: { color: '#b0b0b0' }, grid: { color: '#3a3a3a' }},
+      },
+    }
+  });
+
+  // ── Binoculars per-token: log PPL_M1(t) vs X-PPL(t) ──
+  const ptPpl = bino.per_token_log_ppl_m1 || [];
+  const ptXppl = bino.per_token_x_ppl || [];
+  if (ptPpl.length && ptXppl.length) {
+    const x = ptPpl.map((_,i) => i);
+    drawChart('chart-binoculars', {
+      type: 'line',
+      data: { labels: x, datasets: [
+        { label: 'log PPL_M1 (token surprise)', data: ptPpl,
+          borderColor: '#f44336', borderWidth: 1, pointRadius: 0, fill: false },
+        { label: 'X-PPL (M1 vs M2 distrib.)', data: ptXppl,
+          borderColor: '#2884c7', borderWidth: 1, pointRadius: 0, fill: false },
+      ]},
+      options: chartOpts('token index',
+        `B = ${fmt(bino.score,4)}  (threshold ${fmt(th.binoculars,3)})  —  red ≈ blue → AI`)
+    });
+  } else {
+    drawChart('chart-binoculars', {
+      type: 'line', data: { labels: [], datasets: [] },
+      options: chartOpts('token index', 'Binoculars unavailable on cross-tokenizer pair')
+    });
+  }
+
+  // ── Calculus |l'(t)| bar chart ──
+  const lprime = verbose.l_prime_base || [];
+  const absLp = lprime.map(v => Math.abs(v));
+  drawChart('chart-deriv', {
+    type: 'bar',
+    data: { labels: absLp.map((_,i)=>i),
+      datasets: [{ label: "|l'(t)| base", data: absLp, backgroundColor: '#4caf50' }]},
+    options: chartOpts('token index',
+      `tv2 = Σ|l'(t)| = ${fmt(d_get(res,'differential','tv2'),1)}  (threshold ${fmt(th.tv2,0)})`)
+  });
+}
+
+function d_get(obj, ...path) {
+  let cur = obj;
+  for (const p of path) { if (cur == null) return null; cur = cur[p]; }
+  return cur;
+}
+
+function chartOpts(xLabel, yLabel) {
+  return {
+    responsive: true, animation: false,
+    plugins: { legend: { labels: { color: '#b0b0b0' } } },
+    scales: {
+      x: { ticks: { color: '#b0b0b0', maxTicksLimit: 10 }, title: { display: true, text: xLabel, color: '#b0b0b0' }, grid: { color: '#3a3a3a' }},
+      y: { ticks: { color: '#b0b0b0' }, title: { display: true, text: yLabel, color: '#b0b0b0' }, grid: { color: '#3a3a3a' }},
+    },
+  };
+}
+
+function drawChart(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), cfg);
+}
+
+async function loadRunHistory() {
+  if (!selectedSample) return;
+  const r = await fetch(`/giovanni/samples/${selectedSample.id}/runs`);
+  const data = await r.json();
+  const sec = document.getElementById('run-history');
+  sec.classList.toggle('hidden', data.runs.length === 0);
+  const tbody = sec.querySelector('tbody'); tbody.innerHTML = '';
+  for (const r of data.runs) {
+    const full = await fetch('/giovanni/runs/' + r.id).then(x => x.json());
+    const res = full.result || {};
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>#${r.id}</td>
+      <td>${res.categoria || '—'}</td>
+      <td>${fmt((res.binoculars||{}).score, 4)}</td>
+      <td>${fmt((res.differential||{}).tv2, 1)}</td>
+      <td>${fmt((res.probabilities||{}).p_ai, 3)}</td>
+      <td class="muted">${res.strategy || '—'}</td>
+      <td>${r.duration_ms?(r.duration_ms/1000).toFixed(1)+'s':''}</td>
+      <td class="muted">${(r.created_at||'').slice(0,19).replace('T',' ')}</td>
+      <td><button class="danger" data-rid="${r.id}">×</button></td>`;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('button').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Delete run?')) return;
+    await fetch('/giovanni/runs/' + b.dataset.rid, { method: 'DELETE' });
+    loadRunHistory();
+  }));
+}
+
+// ── Corpus ──
+function fillFeatureSelects() {
+  for (const id of ['sc-x', 'sc-y', 'hg-feat', 'cm-feat']) {
+    const sel = document.getElementById(id); if (sel.options.length) continue;
+    FEATURES.forEach(f => sel.appendChild(new Option(f, f)));
+  }
+  document.getElementById('sc-x').value = 'binoculars';
+  document.getElementById('sc-y').value = 'tv2';
+  document.getElementById('hg-feat').value = 'binoculars';
+  document.getElementById('cm-feat').value = 'binoculars';
+}
+
+let corpusPoints = [];
+async function refreshCorpus() {
+  fillFeatureSelects();
+  const r = await fetch('/giovanni/corpus'); const data = await r.json();
+  corpusPoints = data.points || [];
+  drawScatter(); drawHist(); computeConfusion();
+}
+
+document.getElementById('sc-refresh').addEventListener('click', drawScatter);
+document.getElementById('hg-refresh').addEventListener('click', drawHist);
+document.getElementById('cm-refresh').addEventListener('click', computeConfusion);
+
+function drawScatter() {
+  const xKey = document.getElementById('sc-x').value;
+  const yKey = document.getElementById('sc-y').value;
+  const groups = {};
+  for (const p of corpusPoints) {
+    const lbl = p.label || '_unlabeled';
+    if (p[xKey] == null || p[yKey] == null) continue;
+    (groups[lbl] = groups[lbl] || []).push({ x: p[xKey], y: p[yKey] });
+  }
+  const datasets = Object.entries(groups).map(([lbl, pts]) => ({
+    label: lbl, data: pts, backgroundColor: LABEL_COLORS[lbl] || '#888', pointRadius: 4,
+  }));
+  drawChart('chart-scatter', {
+    type: 'scatter', data: { datasets },
+    options: { ...chartOpts(xKey, yKey), plugins: { legend: { labels: { color: '#b0b0b0' }}}}
+  });
+}
+
+function drawHist() {
+  const feat = document.getElementById('hg-feat').value;
+  const bins = parseInt(document.getElementById('hg-bins').value, 10);
+  const vals = corpusPoints.map(p => p[feat]).filter(v => v != null);
+  if (!vals.length) { drawChart('chart-hist', { type: 'bar', data: {labels:[],datasets:[]}, options: chartOpts(feat,'count')}); return; }
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const w = (max - min) / bins || 1;
+  const byLabel = {};
+  for (const p of corpusPoints) {
+    const v = p[feat]; if (v == null) continue;
+    const lbl = p.label || '_unlabeled';
+    const b = Math.min(bins-1, Math.floor((v - min) / w));
+    byLabel[lbl] = byLabel[lbl] || new Array(bins).fill(0);
+    byLabel[lbl][b]++;
+  }
+  const labels = Array.from({length: bins}, (_,i) => (min + (i+0.5)*w).toFixed(2));
+  const datasets = Object.entries(byLabel).map(([lbl, arr]) => ({
+    label: lbl, data: arr, backgroundColor: LABEL_COLORS[lbl] || '#888', stack: 's',
+  }));
+  drawChart('chart-hist', {
+    type: 'bar', data: { labels, datasets },
+    options: { ...chartOpts(feat, 'count'), scales: {
+      x: { ...chartOpts(feat, 'count').scales.x, stacked: true },
+      y: { ...chartOpts(feat, 'count').scales.y, stacked: true }}}
+  });
+}
+
+function computeConfusion() {
+  const feat = document.getElementById('cm-feat').value;
+  const thr = parseFloat(document.getElementById('cm-thr').value);
+  const dir = document.getElementById('cm-dir').value;
+  let tp=0, fp=0, tn=0, fn=0;
+  for (const p of corpusPoints) {
+    if (!p.label) continue;
+    const v = p[feat]; if (v == null) continue;
+    const isAi = p.label.startsWith('ai');
+    const predAi = dir === 'gt' ? v >= thr : v <= thr;
+    if (isAi && predAi) tp++;
+    else if (!isAi && predAi) fp++;
+    else if (!isAi && !predAi) tn++;
+    else fn++;
+  }
+  const total = tp+fp+tn+fn || 1;
+  const acc = ((tp+tn)/total*100).toFixed(1);
+  const prec = tp+fp ? (tp/(tp+fp)*100).toFixed(1) : '—';
+  const rec = tp+fn ? (tp/(tp+fn)*100).toFixed(1) : '—';
+  document.getElementById('cm-out').innerHTML =
+    `n=${total} · TP=${tp} · FP=${fp} · TN=${tn} · FN=${fn} · acc=${acc}% · prec=${prec}% · rec=${rec}%`;
+}
+
+// ── Helpers ──
+function fmt(n, d=4) { return typeof n === 'number' ? n.toFixed(d) : '—'; }
+function bandFor(metric, value) {
+  // Returns [bandName, leanClass]. leanClass ∈ {lean-syn, lean-hum, lean-mid, lean-sat}.
+  if (value == null) return ['—', 'lean-mid'];
+  if (metric === 'syntheticity') {
+    if (value < 0.30) return ['strong disagreement (rare)', 'lean-hum'];
+    if (value < 0.50) return ['typical-human zone', 'lean-hum'];
+    if (value < 0.65) return ['borderline / academic prose zone', 'lean-mid'];
+    if (value < 0.80) return ['high agreement, synthetic-leaning', 'lean-syn'];
+    return ['near-identical, strongly synthetic', 'lean-syn'];
+  }
+  if (metric === 'humanity_norm') {
+    if (value >= 0.999) return ['SATURATED — raise norm_factor', 'lean-sat'];
+    if (value < 0.30) return ['flat curve, synthetic-leaning', 'lean-syn'];
+    if (value < 0.55) return ['moderate humanity', 'lean-mid'];
+    if (value < 0.80) return ['distinctly human zone', 'lean-hum'];
+    return ['strongly human zone', 'lean-hum'];
+  }
+  return ['—', 'lean-mid'];
+}
+
+function renderCategoryExplanation(res) {
+  const box = document.getElementById('r-explanation');
+  if (res.error || !res.categoria) { box.classList.add('hidden'); return; }
+  const cat = res.categoria;
+  const bino = res.binoculars || {};
+  const probs = res.probabilities || {};
+  const th = res.thresholds || {};
+  const tv2 = (res.differential || {}).tv2;
+  const strat = res.strategy || '—';
+
+  let why;
+  if (strat === 'calculus_only') {
+    why = `<b>Why this verdict:</b> Binoculars cannot run on this pair (different tokenizers).
+      Decision was made on calculus tv2 = ${fmt(tv2,1)} vs threshold ${fmt(th.tv2,0)}.
+      For a Binoculars verdict, switch to a same-tokenizer pair (e.g. <b>falcon</b>).`;
+  } else if (strat === 'binoculars') {
+    if (cat === 'Synthetic') {
+      why = `<b>Why this verdict:</b> Binoculars score B = ${fmt(bino.score,4)} is BELOW threshold
+        ${fmt(th.binoculars,3)}. The two models agree more than expected on the actual tokens —
+        characteristic of machine-generated text. Calculus is currently OFF.`;
+    } else {
+      why = `<b>Why this verdict:</b> Binoculars score B = ${fmt(bino.score,4)} is ABOVE threshold
+        ${fmt(th.binoculars,3)}. The text surprises the observer model relative to what it expected
+        from the performer — characteristic of human writing. Calculus is currently OFF.`;
+    }
+  } else { // binoculars+calculus
+    const dir = cat === 'Synthetic' ? 'AI' : 'human';
+    why = `<b>Why this verdict:</b> the soft-combined probability p_ai = ${fmt(probs.p_ai,3)}
+      sits ${cat === 'Synthetic' ? 'above' : 'below'} 0.5, leaning ${dir}.
+      <br>&nbsp;&nbsp;• Binoculars vote: p_bino = ${fmt(probs.p_bino,3)} (B=${fmt(bino.score,4)} vs threshold ${fmt(th.binoculars,3)})
+      <br>&nbsp;&nbsp;• Calculus vote: p_calc = ${fmt(probs.p_calc,3)} (tv2=${fmt(tv2,1)} vs threshold ${fmt(th.tv2,0)})
+      <br><b>Read the gauge below</b> to see how close the verdict was to flipping.`;
+  }
+
+  box.classList.remove('hidden');
+  box.innerHTML = `<div>${why}</div>`;
+}
+
+function scoreCard(rows) {
+  return rows.map(row => {
+    const [l, v, helpKey] = row;
+    const help = helpKey ? `<button class="help-btn" data-help="${helpKey}" title="What does this number mean?" style="float:right">?</button>` : '';
+    return `<div class="score"><div class="label">${help}${l}</div><div class="val">${v}</div></div>`;
+  }).join('');
+}
+function escapeHtml(s) { return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ── Init ──
+refreshSamples();
+</script>
+</body>
+</html>

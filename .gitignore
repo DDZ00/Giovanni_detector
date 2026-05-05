@@ -1,0 +1,55 @@
+# ── Python build/cache ──────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*$py.class
+.pytest_cache/
+*.egg-info/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ── Virtual environments ────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Runtime data — DO NOT publish ───────────────────────────
+# data/ holds giovanni.db (SQLite) with the actual research samples
+# (text, labels, runs). Public commit would leak labelled corpus.
+data/
+logs/
+
+# ── Model weights ───────────────────────────────────────────
+# GGUF files are multi-GB (over GitHub's 100 MB hard limit) and the
+# Falcon weights are not ours to redistribute under the HF license.
+models/
+*.gguf
+*.bin
+*.safetensors
+
+# ── Local secrets ───────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# ── IDE / OS noise ──────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ── Local conversation/session dumps ────────────────────────
+# Personal chat transcripts that accumulated in this directory.
+2026-*-session*.txt
+*-retake-*-session*.txt
+2026-05-01-210655-retake-lask-session-we-where-working-on-giovanni.txt
