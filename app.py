@@ -64,12 +64,17 @@ def analyze():
     if not isinstance(text, str) or not text.strip():
         return jsonify({"error": "Field 'text' is required and must be a non-empty string"}), 400
     verbose = bool(body.get("verbose", False))
-    params = _params_from_dict(body.get("params") or {})
+    english_proficiency = body.get("english_proficiency") or None
+    ui_params = body.get("params") or {}
+    params = _params_from_dict(ui_params)
+    # Same proficiency-aware override as /samples/<id>/analyze.
+    if "threshold_binoculars" not in ui_params and english_proficiency == "non_native":
+        params["threshold_binoculars"] = Config.THRESHOLD_BINOCULARS_NON_NATIVE
     refusal = _refuse_if_binoculars_on_cross_pair(params)
     if refusal:
         return refusal
-    logger.info("analyze adhoc: words=%d sha256=%s pair=%s n_ctx=%d use_calculus=%s",
-                len(text.split()), _short_sha(text), params["pair_id"], params["n_ctx"], params["use_calculus"])
+    logger.info("analyze adhoc: words=%d sha256=%s pair=%s n_ctx=%d use_calculus=%s eng=%s",
+                len(text.split()), _short_sha(text), params["pair_id"], params["n_ctx"], params["use_calculus"], english_proficiency)
 
     try:
         scorer_base, scorer_instruct = scorers_module.get_scorers(pair_id=params["pair_id"], n_ctx=params["n_ctx"])
@@ -79,7 +84,12 @@ def analyze():
 
     t0 = time.perf_counter()
     try:
-        result = analyze_text(text, scorer_base, scorer_instruct, verbose=verbose, **_analyzer_kwargs(params))
+        result = analyze_text(
+            text, scorer_base, scorer_instruct,
+            verbose=verbose,
+            english_proficiency=english_proficiency,
+            **_analyzer_kwargs(params),
+        )
     except FileNotFoundError as e:
         logger.exception("analyze adhoc failed: missing model file")
         return jsonify({"error": "model file missing", "detail": str(e),
@@ -222,13 +232,19 @@ def analyze_sample(sample_id: int):
         return jsonify({"error": "sample not found"}), 404
 
     body = request.get_json(silent=True) or {}
-    params = _params_from_dict(body.get("params") or {})
+    ui_params = body.get("params") or {}
+    params = _params_from_dict(ui_params)
+    # Proficiency-aware Binoculars threshold (only when caller did not
+    # explicitly override threshold_binoculars in the request body).
+    if "threshold_binoculars" not in ui_params and s.get("english_proficiency") == "non_native":
+        params["threshold_binoculars"] = Config.THRESHOLD_BINOCULARS_NON_NATIVE
     refusal = _refuse_if_binoculars_on_cross_pair(params)
     if refusal:
         return refusal
     verbose = bool(body.get("verbose", True))  # default verbose for stored runs
-    logger.info("analyze sample #%d (%s): words=%d sha256=%s params=%s",
-                sample_id, s.get("label"), s["n_words"], (s.get("sha256") or "")[:8], params)
+    logger.info("analyze sample #%d (%s): words=%d sha256=%s eng=%s thr_bino=%s params=%s",
+                sample_id, s.get("label"), s["n_words"], (s.get("sha256") or "")[:8],
+                s.get("english_proficiency"), params["threshold_binoculars"], params)
 
     try:
         scorer_base, scorer_instruct = scorers_module.get_scorers(pair_id=params["pair_id"], n_ctx=params["n_ctx"])
@@ -238,7 +254,12 @@ def analyze_sample(sample_id: int):
 
     t0 = time.perf_counter()
     try:
-        result = analyze_text(s["text"], scorer_base, scorer_instruct, verbose=verbose, **_analyzer_kwargs(params))
+        result = analyze_text(
+            s["text"], scorer_base, scorer_instruct,
+            verbose=verbose,
+            english_proficiency=s.get("english_proficiency"),
+            **_analyzer_kwargs(params),
+        )
     except FileNotFoundError as e:
         logger.exception("analyze failed: missing model file")
         return jsonify({"error": "model file missing", "detail": str(e),

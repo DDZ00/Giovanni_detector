@@ -40,10 +40,21 @@ def analyze_text(
     min_words: int | None = None,
     max_chunk: int | None = None,
     same_tokenizer: bool = True,
+    english_proficiency: str | None = None,
     verbose: bool = False,
 ) -> Dict[str, Any]:
-    """Run the full Binoculars + calculus pipeline on `text`."""
-    threshold_binoculars = Config.THRESHOLD_BINOCULARS if threshold_binoculars is None else threshold_binoculars
+    """Run the full Binoculars + calculus pipeline on `text`.
+
+    english_proficiency: "native" | "non_native" | None. When "non_native"
+    and threshold_binoculars is not explicitly overridden, the analyzer uses
+    Config.THRESHOLD_BINOCULARS_NON_NATIVE — a relaxed cut calibrated on the
+    2018 IB EE corpus. An explicit threshold_binoculars wins.
+    """
+    if threshold_binoculars is None:
+        if english_proficiency == "non_native":
+            threshold_binoculars = Config.THRESHOLD_BINOCULARS_NON_NATIVE
+        else:
+            threshold_binoculars = Config.THRESHOLD_BINOCULARS
     threshold_tv2 = Config.THRESHOLD_TV2 if threshold_tv2 is None else threshold_tv2
     use_calculus = Config.USE_CALCULUS if use_calculus is None else use_calculus
     binoculars_weight = Config.BINOCULARS_WEIGHT if binoculars_weight is None else binoculars_weight
@@ -141,8 +152,13 @@ def analyze_text(
         "probabilities": {k: (round(v, 6) if isinstance(v, float) else v) for k, v in probabilities.items()},
         "thresholds": {
             "binoculars": threshold_binoculars,
+            "binoculars_source": (
+                "non_native" if english_proficiency == "non_native"
+                else "native_paper"
+            ),
             "tv2": threshold_tv2,
         },
+        "english_proficiency": english_proficiency,
         "blend": {
             "binoculars_weight": binoculars_weight,
             "binoculars_steepness": binoculars_steepness,

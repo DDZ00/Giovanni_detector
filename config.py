@@ -11,7 +11,7 @@ import os
 
 class Config:
     # ── Service identity ────────────────────────────────────────
-    VERSION = "0.3.0"
+    VERSION = "0.3.2"
     SERVICE_NAME = "giovanni"
 
     # ── Server ──────────────────────────────────────────────────
@@ -30,31 +30,42 @@ class Config:
     # RANGE:    typical [0.5, 1.2].
     # POLARITY: B < threshold → AI;   B > threshold → human.
     # PAIR:     Falcon-7B base + Falcon-7B-Instruct — the same pair the
-    #           Binoculars paper used. The threshold below is the paper's
-    #           value, applied verbatim. This is the load-bearing detector
-    #           signal; the calculus blend below is a secondary check.
+    #           Binoculars paper used. Native-English (or unknown
+    #           proficiency) verdicts use this threshold, the paper value
+    #           applied verbatim.
     THRESHOLD_BINOCULARS = 0.901
 
-    # ── Calculus strategy (the personal contribution) ───────────
-    # Total-variation of the base-model log-prob first derivative.
-    #
-    # RANGE:    typical [200, 3000] for ~500-word texts.
-    # POLARITY: tv2 > threshold → AI;   tv2 < threshold → human.
-    #           NOTE: this is the OPPOSITE of what the calibration plan
-    #           (docs/plans/GIOVANNI_SCORE_CALIBRATION.md) documented as
-    #           the expected case. The threshold below was set empirically
-    #           against a small handful of samples, which polarized this way.
-    # OBSERVED (small corpus, 2026-05-02; tv2 uses base model only):
-    #     human-l1=1685.3, ai-clean=1876.9, ai-clean=1867.6
-    # NOTE: tv2 magnitudes are model-pair-specific. These observations were
-    # taken on a different scorer pair than the current Falcon-only setup;
-    # the threshold may need adjustment once Falcon tv2 is observed in
-    # practice. Treat verdicts as interpretive, not statistical.
+    # Non-native English writers produce systematically lower B because their
+    # token sequences are smoother / more formulaic to a Falcon-7B base
+    # trained on English-dominated web corpora — a known Binoculars
+    # limitation flagged in Hans et al. §6.2. Calibrated 2026-05-09 against
+    # 7 IB Extended Essays (English B SL) from 2018, all known-human (the
+    # cohort predates student-accessible AI):
+    #     B observed range 0.826 – 0.885 (mean 0.86, σ ≈ 0.02)
+    #     min margin above 0.82 = 0.006 — thin; widen the corpus before
+    #     tightening this number further.
+    # Engaged when analyze_text() receives english_proficiency="non_native".
+    # Trade-off: AI samples in the same B band (Gemini=0.862, DeepSeek=0.882
+    # in the small calibration corpus) will also score Human under this
+    # threshold. Falcon-7B Binoculars cannot resolve that overlap; only a
+    # different model pair or a real labelled classifier can.
+    THRESHOLD_BINOCULARS_NON_NATIVE = 0.82
+
+    # ── Calculus strategy (deprecated 2026-05-09) ───────────────
+    # tv2 = total-variation Σ|l(t+1) − l(t)| of the base-model logprob curve.
+    # As an UNNORMALIZED sum, it scales linearly with text length; once you
+    # divide by token count the human/AI distributions overlap (humans
+    # 3.09–3.97 per token, AI 2.86–3.82 per token on the 11-sample corpus
+    # 2026-05-09). The discriminative power that originally tuned
+    # THRESHOLD_TV2 was almost entirely a length proxy, not AI-vs-human
+    # signal. USE_CALCULUS is now False; the constants below are kept for
+    # historical context and for the dashboard's "show me the numbers" view.
     THRESHOLD_TV2 = 1775.0
 
-    # Master switch. False = pure Binoculars verdict (paper baseline).
-    # True = Binoculars soft-combined with calculus tv2 via sigmoid blend.
-    USE_CALCULUS = True
+    # Master switch. False = pure Binoculars verdict (paper baseline +
+    # proficiency-aware threshold). True kept available for ablation /
+    # research mode but no longer the default.
+    USE_CALCULUS = False
 
     # Soft-combine knobs. p_ai = w * p_bino + (1-w) * p_calc.
     #
@@ -90,12 +101,13 @@ class Config:
 
     # ── REMINDER ─────────────────────────────────────────────────
     # Giovanni is a working interpretive tool, not a statistically validated
-    # classifier. THRESHOLD_TV2 and CALCULUS_STEEPNESS were picked from a
-    # small corpus (2026-05-02) and refined empirically. THRESHOLD_BINOCULARS
-    # is the Hans et al. 2024 paper value, applied verbatim on the pair the
-    # paper used. Treat individual verdicts as one signal among many; if you
-    # disagree with a verdict, the dashboard exposes the underlying numbers
-    # so you can see why.
+    # classifier. THRESHOLD_BINOCULARS is the Hans et al. 2024 paper value
+    # applied verbatim. THRESHOLD_BINOCULARS_NON_NATIVE was calibrated on a
+    # 7-essay non-native English corpus (2018 IB EE) — the corpus is small,
+    # and Falcon-7B Binoculars cannot resolve non-native human vs AI inside
+    # the [0.82, 0.95] B band on this pair. Treat verdicts in that band as
+    # one signal among many; if you disagree with a verdict, the dashboard
+    # exposes B, the threshold actually used, and the calculus signals.
     # ─────────────────────────────────────────────────────────────
 
     # ── Processing parameters ───────────────────────────────────
@@ -137,4 +149,4 @@ class Config:
 
     # ── Inputs ──────────────────────────────────────────────────
     ALLOWED_EXTENSIONS = {"txt", "docx"}
-    MAX_UPLOAD_SIZE_MB = 10
+    MAX_UPLOAD_SIZE_MB = int(os.getenv("GIOVANNI_MAX_UPLOAD_MB", "200"))
